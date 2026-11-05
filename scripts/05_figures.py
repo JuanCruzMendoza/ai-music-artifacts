@@ -197,6 +197,70 @@ def fig_pitch(band):
     plt.close(fig)
 
 
+def fig_peaks_lasso():
+    """¿El modelo usa los picos? Picos detectados vs bins elegidos por el Lasso."""
+    p = RES / "peaks_final.npz"
+    if not p.exists():
+        return
+    z = np.load(p)
+    f, P, suno = z["f"] / 1000, z["P"], z["suno"]
+    best = json.load(open(RES / "peaks_summary.json"))
+    w_sparse = np.load(RES / "lasso_w_C0.01.npy")
+    fig, axes = plt.subplots(3, 1, figsize=(9, 7), sharex=True)
+    d = z["mean_suno"] - z["mean_real"]
+    axes[0].plot(f, d, color="#eb6834", lw=0.6)
+    axes[0].plot(f[suno], d[suno], "o", ms=3, color=TEXT2, label=f"picos detectados ({suno.sum()})")
+    axes[0].set_title("Huella promedio de Suno menos la de las reales, con los picos detectados", fontsize=10)
+    axes[0].legend(loc="upper right")
+    for ax, w, title in [
+        (axes[1], w_sparse, "Lasso muy esparso (λ = 100): los pocos bins que usa para decir IA son picos"),
+        (axes[2], z["w1"], f"Lasso elegido por CV (λ = {best['lasso_lambda']:.1f}): suma cientos de bins que no son picos"),
+    ]:
+        nz = w != 0
+        col = np.where(P[nz], "#eb6834", np.where(w[nz] > 0, "#e8a37f", "#2a78d6"))
+        ax.vlines(f[nz], 0, w[nz], colors=col, lw=0.8)
+        ax.axhline(0, color=TEXT2, lw=0.5)
+        ax.set_title(title, fontsize=10)
+        ax.set_ylabel("coeficiente")
+    from matplotlib.lines import Line2D
+    axes[2].legend(handles=[Line2D([], [], color="#eb6834", lw=2, label="en un pico"),
+                            Line2D([], [], color="#e8a37f", lw=2, label="indica IA, fuera de picos"),
+                            Line2D([], [], color="#2a78d6", lw=2, label="indica real")],
+                   loc="lower right", ncols=3, fontsize=8)
+    axes[2].set_xlabel("frecuencia (kHz)")
+    fig.tight_layout()
+    fig.savefig(FIGS / "fig7_lasso_picos.png")
+    plt.close(fig)
+
+
+def fig_peaks_retrain():
+    """Reentrenar solo con picos / solo con bins al azar / sin picos, por clase."""
+    p = RES / "peaks_retrain.csv"
+    if not p.exists():
+        return
+    r = pd.read_csv(p).groupby("caso")[["real", "suno_v3.5", "udio_130", "n_bins"]].mean()
+    cases = [("todos los bins", "todos los bins", "#b9b8b3"), ("solo picos", "solo los picos", "#eb6834"),
+             ("solo bins al azar", "solo bins al azar (misma cantidad)", "#6250d6"), ("sin picos", "todo menos los picos", "#2a78d6")]
+    fig, ax = plt.subplots(figsize=(9, 3.6))
+    h = 0.2
+    for i, (key, lab, col) in enumerate(cases):
+        yv = np.arange(3) + (i - 1.5) * h
+        v = r.loc[key, GENS].values * 100
+        ax.barh(yv, v, height=h - 0.03, color=col, label=f"{lab} ({int(round(r.loc[key, 'n_bins']))} bins)")
+        for yy, vv in zip(yv, v):
+            ax.text(vv + 0.5, yy, f"{vv:.0f}", va="center", fontsize=7.5, color=TEXT2)
+    ax.set_yticks(np.arange(3), [LABELS[g] for g in GENS])
+    ax.invert_yaxis()
+    ax.set_xlim(40, 104)
+    ax.set_xlabel("% bien clasificadas (validación cruzada, modelo reentrenado con esos bins)")
+    ax.legend(loc="upper center", bbox_to_anchor=(0.45, -0.22), ncols=2, fontsize=8.5)
+    ax.grid(axis="y", visible=False)
+    ax.set_title("Los picos alcanzan para Suno, pero no sirven para Udio ni son necesarios")
+    fig.tight_layout()
+    fig.savefig(FIGS / "fig8_picos_reentrenar.png")
+    plt.close(fig)
+
+
 def main():
     FIGS.mkdir(parents=True, exist_ok=True)
     band, C = choice()
@@ -205,6 +269,8 @@ def main():
     if (RES / "cv_codec.csv").exists():
         fig_accuracy()
     fig_robustness()
+    fig_peaks_lasso()
+    fig_peaks_retrain()
     if (RES / "robustness.csv").exists():
         fig_pitch(band)
     fig_codec(m, spec)

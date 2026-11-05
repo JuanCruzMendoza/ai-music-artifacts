@@ -41,6 +41,16 @@ Decisiones y cambios respecto de [spec.md](spec.md), en orden. Todo se corrió *
 - **El pitch shift de librosa** (phase vocoder) agrega un ondulado periódico propio a la huella. Por eso el gráfico del corrimiento de picos usa el cambio de velocidad, que es un resampleo puro.
 - **E3/E4 usan solo la regresión logística.**
 
+## ¿El modelo usa los picos? (`scripts/08_peaks.py`, agregado después del spec)
+- **Definición de pico:** bins donde (huella media del generador − huella media de las reales) supera en más de 5 desvíos robustos (MAD × 1,4826) a su mediana local (ventana de 51 bins ≈ 50 Hz). Se usa la diferencia con las reales para no marcar lo que comparten todas las clases, como el borde de la banda o notas musicales comunes. Unión de Suno y Udio, ensanchada ±1 bin.
+- **Sin fuga de datos:** dentro de la CV, los picos se recalculan en cada fold solo con los datos de entrenamiento. Las cifras de concentración y la Figura 7 usan los picos y modelos de todo dev.
+- **Control al azar:** la misma cantidad exacta de bins que los picos, en bloques de 3 contiguos y fuera de los picos. Ablación: 20 repeticiones por fold. Reentrenar: 5 repeticiones por fold.
+  - Bug corregido: la primera versión elegía la misma cantidad de *centros* y quedaba con más bins (377 contra 278).
+- **Ablación:** los bins se pisan con los de una canción real de entrenamiento elegida al azar.
+  - La primera versión usaba el promedio de las reales. Como los valores son asimétricos, el promedio queda por encima del valor típico y empujaba todo hacia "IA" (subía Udio y los falsos positivos).
+- **Lasso:** `LogisticRegression(l1_ratio=1, solver="liblinear", class_weight="balanced")`. En sklearn 1.8 `penalty="l1"` está deprecado, por eso se usa `l1_ratio=1`. λ = 1/C, con C ∈ {0,003 … 10}, elegido por balanced accuracy en la misma CV de 5 folds. Resultado: **λ = 3,3 (C = 0,3)**, con balanced accuracy de 95,2%, algo menos que la regresión logística L2 (96,7%).
+- **Hallazgo lateral:** algunos picos en 554 / 622 / 659 Hz aparecen en Suno y en Udio. Coinciden con notas musicales (Do#5, Re#5, Mi5): probablemente sean afinación perfecta de la IA, no artefactos del decoder.
+
 ## Heldout (preparado, no corrido)
 - `scripts/07_heldout.py` exige `--allow-heldout`. Con ese flag, 02 y 03 procesan **solo** el heldout y guardan los espectros en archivos aparte (`*__heldout.npz`), así que dev y heldout no se mezclan.
 - **Plan fijado de antemano:**
@@ -61,5 +71,6 @@ uv run python scripts/06_robustness.py prepare
 for t in speed-5 speed-2 speed+2 speed+5 speed+3 mp3_128 mp3_64 lp_6k lp_4k noise_30 noise_20 pitch-2 pitch-1 pitch+1 pitch+2 pitch+0.5; do
   uv run python scripts/03_spectra.py --transform $t --uids data/results/robust_uids_$t.csv; done
 uv run python scripts/06_robustness.py eval   # E3/E4
+uv run python scripts/08_peaks.py             # ¿usa los picos? + Lasso
 uv run python scripts/05_figures.py           # docs/figs/
 ```

@@ -4,35 +4,82 @@ Trabajo práctico — Procesamiento de Señales / Series Temporales
 
 ## Idea
 
-Los modelos generativos de música (Suno, Udio, MusicGen, etc.) sintetizan el audio con un decoder neuronal cuyas capas de *upsampling* (deconvolución con stride) introducen artefactos periódicos en el dominio de la frecuencia: picos espectrales pequeños pero sistemáticos en posiciones fijas, análogos a los artefactos *checkerboard* en imágenes [1]. La música grabada por humanos no presenta esta estructura. El proyecto consiste en construir un detector de música generada por IA basado exclusivamente en herramientas de procesamiento de señales (STFT, PSD, detección de picos), sin redes neuronales, y evaluar sus límites.
+Los generadores de música (Suno, Udio, etc.) producen el audio con un decoder neuronal. Sus capas de *upsampling* (deconvolución con stride) dejan picos espectrales chicos pero sistemáticos, siempre en las mismas frecuencias, análogos a los artefactos *checkerboard* en imágenes [1]. La música grabada por humanos no tiene esa estructura.
 
-## Objetivos
+El TP replica la Tabla 2 de [1]: un clasificador lineal sobre esa "huella" espectral, entrenado con canciones de SONICS (IA) y FMA (reales). Además mide sus límites: ¿detecta el artefacto o el formato de los archivos? ¿Sobrevive a modificaciones del audio?
 
-1. **Caracterizar el artefacto.** Calcular la PSD promedio (Welch) y el espectro promediado en el tiempo (STFT) de música real y generada, restar el piso local y visualizar los picos periódicos y el corte de ancho de banda que distinguen a la música IA.
-2. **Construir un detector interpretable.** A partir de la "huella" espectral de cada fragmento, extraer features (posición y altura de picos, roll-off, energía en bandas altas, planitud espectral) y entrenar un clasificador lineal como *baseline*, reproduciendo el criterio de [1].
-3. **Evaluar robustez.** Medir la degradación del detector bajo transformaciones que alteran el espectro (remuestreo a 22.05 kHz, filtrado pasabajos, compresión MP3, pitch-shift), siguiendo la metodología de [2] y [3], y verificar si el detector aprende el artefacto o el pipeline de producción.
-4. **Explorar mejoras.** Comparar modelos de ML (regresión logística, SVM, gradient boosting) y features derivadas invariantes a la posición de los picos (p. ej. autocorrelación o cepstrum de la huella) para mejorar la generalización a transformaciones y a generadores no vistos en entrenamiento.
+## Hipótesis
 
-## Datos
+1. La huella espectral alcanza para separar Suno y Udio de música real con un clasificador lineal.
+2. La huella se rompe con transformaciones que mueven las frecuencias (cambio de tono o de velocidad) y resiste las que no las mueven (MP3, pasabajos, ruido).
 
-- Música generada: dataset **SONICS** [4] (Suno, Udio) y/o **FakeMusicCaps** [5].
-- Música real: subconjunto de **FMA** (Free Music Archive).
-- Todo el audio se homogeneiza a 44.1 kHz, mono y mismo formato para evitar que el clasificador aprenda diferencias de codec en lugar del artefacto.
+## Diseño experimental
 
+Detalle completo en [docs/spec.md](docs/spec.md).
+
+**Datos**
+
+| Clase | Fuente | Generadores |
+|---|---|---|
+| Real | FMA-small (clips de 30 s) | — |
+| IA | SONICS [4] | Suno v2, v3, v3.5 · Udio 32, 130 |
+
+**Particiones.** Dev y heldout son disjuntas (sin artistas de FMA ni canciones de SONICS compartidas).
+- **dev:** con dev se elige todo por validación cruzada de 5 folds. Contiene ~7.200 reales y ~1.800 canciones por generador visto (Suno v3.5 y Udio 130).
+- **heldout:** se evalúa una sola vez, con el pipeline congelado. Tiene dos partes:
+  - generadores vistos (Suno v3.5, Udio 130);
+  - generadores no vistos (Suno v2, Suno v3, Udio 32).
+
+**Preprocesamiento.** SONICS viene en un MP3 muy comprimido (16 kHz, mono, ~38 kbps). Para que el clasificador no aprenda el formato del archivo en lugar del artefacto, las reales se re-comprimen igual. Todo se recorta a la misma duración.
+
+**Features.** La huella espectral del código de Deezer [1]:
+1. Espectro promedio con FFT de 16.384 puntos (≈ 1 Hz por bin).
+2. Se resta el piso local, para que solo queden los picos.
+3. Se normaliza.
+
+No se usan otras features.
+
+**Modelo.** Regresión logística (como el paper), comparada con SVM lineal y SVM RBF. Métrica principal: *balanced accuracy*.
+
+**Experimentos**
+
+| | Qué se mide |
+|---|---|
+| E1 | Cómo es la huella de cada clase y qué frecuencias usa el clasificador |
+| E2 | Acierto por clase (comparable con la Tabla 2 del paper) |
+| Control de codec | E2 sin igualar el MP3, como el paper: ¿cuánto del acierto viene del formato? |
+| E3 | Robustez: tono ±1/±2 semitonos, velocidad ±2/±5%, MP3 64/128 kbps, pasabajos 6/4 kHz, ruido SNR 30/20 dB |
+| E4 | Si entrenar con audio modificado (augmentation) mejora la robustez |
+
+## Documentación
+
+- [docs/spec.md](docs/spec.md): diseño del experimento.
+- [docs/log.md](docs/log.md): decisiones de implementación y cambios respecto del spec.
+- [docs/resultados.md](docs/resultados.md): hallazgos (por ahora solo dev).
+
+## Cómo correr
+
+```bash
+uv sync
+uv run python scripts/01_manifest.py   # define dev / heldout
+uv run python scripts/02_download.py   # baja solo dev (~11 GB)
+uv run python scripts/03_spectra.py    # espectros
+uv run python scripts/04_cv.py         # E2 + control de codec
+```
+
+Los pasos de robustez y figuras están en [docs/log.md](docs/log.md). El heldout (`scripts/07_heldout.py`) exige `--allow-heldout`.
 
 ## Explicaciones
 
 ### PSD (power spectral density)
 PSD es la densidad espectral de potencia: una curva que te dice cuánta potencia tiene la señal en cada frecuencia. Es lo que calcula Welch: para una canción te devuelve un vector con un valor por frecuencia, graficado en dB.
 
-“PSD promedio” se refiere a promediar esas curvas entre muchas canciones de la misma clase. Calculás la PSD de cada fragmento real, las promediás todas y obtenés una sola curva que representa “cómo es el espectro típico de la música real”. Hacés lo mismo con las canciones de IA, y superponés las dos.
+"PSD promedio" se refiere a promediar esas curvas entre muchas canciones de la misma clase. Calculás la PSD de cada fragmento real, las promediás todas y obtenés una sola curva que representa "cómo es el espectro típico de la música real". Hacés lo mismo con las canciones de IA, y superponés las dos.
 
-El motivo de promediar es que la PSD de una sola canción depende mucho de esa canción (género, instrumentación, mezcla), y eso enmascara lo que te interesa. Al promediar sobre cientos de canciones, las diferencias individuales se cancelan y queda lo que es sistemático en cada clase: en la música IA, el corte abrupto de ancho de banda y los picos fijos del decoder, que en la real no están.
-
+El motivo de promediar es que la PSD de una sola canción depende mucho de esa canción (género, instrumentación, mezcla), y eso enmascara lo que te interesa. Al promediar sobre cientos de canciones, las diferencias individuales se cancelan y queda lo que es sistemático en cada clase: en la música IA, los picos fijos del decoder, que en la real no están.
 
 ### STFT (Short-Time Fourier Transform)
 Se parte la señal en ventanas cortas solapadas, se aplica una FFT a cada una y se obtiene una matriz tiempo-frecuencia (el espectrograma). Sirve para ver cómo cambia el contenido en frecuencia a lo largo de la canción, a diferencia de la PSD de Welch, que resume toda la señal en un único espectro.
-
 
 ## Referencias
 
@@ -43,5 +90,3 @@ Se parte la señal en ventanas cortas solapadas, se aplica una FFT a cada una y 
 [3] D. Afchar, G. Meseguer-Brocal, R. Hennequin. *Detecting music deepfakes is easy but actually hard*. 2024. https://arxiv.org/abs/2405.04181
 
 [4] M. A. Rahman et al. *SONICS: Synthetic Or Not — Identifying Counterfeit Songs*. ICLR 2025. https://arxiv.org/abs/2408.14080
-
-[5] L. Comanducci et al. *FakeMusicCaps: a Dataset for Detection and Attribution of Synthetic Music Generated via Text-to-Music Models*. 2024. https://arxiv.org/abs/2409.10684
