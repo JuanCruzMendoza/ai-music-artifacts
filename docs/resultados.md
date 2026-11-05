@@ -129,16 +129,16 @@ El modelo no aprende "hay picos, estén donde estén": memoriza algunas posicion
 
 | Lasso: λ | Bins que usa para decir "IA" | % de esos bins que son picos | Suno detectado | Udio detectado | Balanced accuracy |
 |---|---|---|---|---|---|
-| 100 | 14 | **100%** | 100 | 31 | 79,2 |
+| 100 | 14 | **100%** | 100 | 31 | 79,3 |
 | 33 | 29 | **86%** | 100 | 80 | 90,9 |
-| 10 | 191 | 25% | 100 | 89 | 94,4 |
-| **3,3 (elegido por CV)** | 436 | 12% | 100 | 90 | **95,2** |
+| 10 | 190 | 25% | 100 | 89 | 94,4 |
+| **3,3 (elegido por CV)** | 437 | 12% | 100 | 90 | **95,2** |
 | 1 | 661 | 10% | 100 | 89 | 95,1 |
 
 *(Se barrió λ = 333 / 100 / 33 / 10 / 3,3 / 1 / 0,3 / 0,1; los extremos rinden peor.)*
 
 - **Cuando el Lasso puede usar muy pocos bins, elige exactamente los picos.** Con λ = 100, los 14 bins que usa para decir "IA" son todos picos de Suno (3,2 / 4,0 / 4,4 / 4,6 kHz…), cuando los picos son solo el 4% de la banda. Con eso detecta el 100% de Suno, pero casi nada de Udio.
-- **Para detectar Udio necesita cientos de bins más, casi ninguno en un pico.** El Lasso elegido usa 436 bins "IA", de los cuales solo el 12% son picos, aunque concentran el 21% de su peso (5 veces más que el azar). En la regresión logística normal, los picos tienen el 12% del peso (3 veces más que el azar).
+- **Para detectar Udio necesita cientos de bins más, casi ninguno en un pico.** El Lasso elegido usa 437 bins "IA", de los cuales solo el 12% son picos, aunque concentran el 21% de su peso (5 veces más que el azar). En la regresión logística normal, los picos tienen el 12% del peso (3 veces más que el azar).
 
 | Ablación (modelo ya entrenado) | Reales | Suno | Udio | Balanced accuracy |
 |---|---|---|---|---|
