@@ -1,0 +1,22 @@
+[project]
+name = "ai-music-artifacts"
+version = "0.1.0"
+description = "TP: detección de música generada por IA mediante la huella espectral (réplica de Afchar et al., ISMIR 2025)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "numpy",
+    "scipy",
+    "pandas",
+    "scikit-learn",
+    "soundfile",
+    "soxr",
+    "librosa",
+    "matplotlib",
+    "imageio-ffmpeg",
+    "lameenc",
+    "mutagen",
+    "tqdm",
+]
+
+[tool.uv]
+package = false
