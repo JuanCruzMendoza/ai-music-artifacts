@@ -69,18 +69,6 @@ uv run python scripts/04_cv.py         # E2 + control de codec
 
 Los pasos de robustez y figuras están en [docs/log.md](docs/log.md). El heldout (`scripts/07_heldout.py`) exige `--allow-heldout`.
 
-## Explicaciones
-
-### PSD (power spectral density)
-PSD es la densidad espectral de potencia: una curva que te dice cuánta potencia tiene la señal en cada frecuencia. Es lo que calcula Welch: para una canción te devuelve un vector con un valor por frecuencia, graficado en dB.
-
-"PSD promedio" se refiere a promediar esas curvas entre muchas canciones de la misma clase. Calculás la PSD de cada fragmento real, las promediás todas y obtenés una sola curva que representa "cómo es el espectro típico de la música real". Hacés lo mismo con las canciones de IA, y superponés las dos.
-
-El motivo de promediar es que la PSD de una sola canción depende mucho de esa canción (género, instrumentación, mezcla), y eso enmascara lo que te interesa. Al promediar sobre cientos de canciones, las diferencias individuales se cancelan y queda lo que es sistemático en cada clase: en la música IA, los picos fijos del decoder, que en la real no están.
-
-### STFT (Short-Time Fourier Transform)
-Se parte la señal en ventanas cortas solapadas, se aplica una FFT a cada una y se obtiene una matriz tiempo-frecuencia (el espectrograma). Sirve para ver cómo cambia el contenido en frecuencia a lo largo de la canción, a diferencia de la PSD de Welch, que resume toda la señal en un único espectro.
-
 ## Referencias
 
 [1] D. Afchar, G. Meseguer-Brocal, K. Akesbi, R. Hennequin. *A Fourier Explanation of AI-music Artifacts*. ISMIR 2025. https://arxiv.org/abs/2506.19108 — Código: https://github.com/deezer/ismir25-ai-music-detector
