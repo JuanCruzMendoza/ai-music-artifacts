@@ -145,6 +145,27 @@ El modelo no aprende "hay picos, estén donde estén": memoriza algunas posicion
 | Sin tocar | 96,6 | 100 | 93,5 | 96,7 |
 | Picos pisados | 93,2 | **90,8** | 94,2 | **92,8** |
 | Misma cantidad de bins al azar pisados | 97,4 | 99,9 | 90,1 | 96,2 |
+(con el modelo principal: regresión logística L2 con C = 0,03)
+
+
+
+**Pisando cada vez más picos.** Se repitió la ablación bajando el umbral que define un pico (de 10 a 2 desvíos): cuanto más bajo, más picos chicos entran, y en el umbral más bajo llegan al 21% de la banda. Cada punto se compara con pisar la misma cantidad de bins al azar.
+
+![Curva de ablación](figs/fig9_ablacion_curva.png)
+
+| Umbral | Bins pisados (% de la banda) | Suno detectado: picos / azar | Udio detectado: picos / azar | Balanced accuracy: picos / azar |
+|---|---|---|---|---|
+| — (sin tocar) | 0 | 100 | 93,5 | 96,7 |
+| 10 | 69 (1%) | 98,8 / 100 | 94,9 / 92,7 | 96,1 / 96,6 |
+| 5 | 278 (4%) | 91,4 / 99,9 | 95,1 / 89,9 | 93,1 / 96,2 |
+| 3 | 672 (10%) | **80,4** / 99,4 | 93,3 / 81,0 | 88,6 / 94,2 |
+| 2 | 1.465 (21%) | **75,1** / 91,6 | 88,0 / **53,1** | 83,8 / 85,6 |
+
+*(La fila del umbral 5 difiere un poco de la tabla anterior porque las canciones reales donantes se sortean de nuevo.)*
+
+- **Suno depende de los picos, también de los chicos.** Al bajar el umbral, la detección de Suno cae sin parar (100 → 75%). Pisar la misma cantidad de bins al azar casi no la afecta hasta el 14% de la banda. Aun así, con el 21% de la banda pisada sigue detectando el 75%: queda información de Suno fuera de lo que marcamos como pico.
+- **Udio es la imagen opuesta.** Pisar sus "picos" no le hace nada, y pisar bins al azar lo hunde (93 → 53%). Su huella está repartida por toda la banda.
+- **Las reales también empeoran al pisar picos** (96,6 → 86%), pero no porque se parezcan más a la IA: en promedio su puntaje casi no cambia. Como esos bins tienen pesos grandes, reemplazarlos por los de otra canción agrega "ruido" al puntaje, y algunas reales que estaban cerca del límite cruzan a "IA".
 
 ![Reentrenar](figs/fig8_picos_reentrenar.png)
 

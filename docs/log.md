@@ -51,6 +51,11 @@ Decisiones y cambios respecto de [spec.md](spec.md), en orden. Todo se corrió *
 - **Lasso:** `LogisticRegression(l1_ratio=1, solver="liblinear", class_weight="balanced")`. En sklearn 1.8 `penalty="l1"` está deprecado, por eso se usa `l1_ratio=1`. λ = 1/C, con C ∈ {0,003 … 10}, elegido por balanced accuracy en la misma CV de 5 folds. Resultado: **λ = 3,3 (C = 0,3)**, con balanced accuracy de 95,2%, algo menos que la regresión logística L2 (96,7%).
 - **Hallazgo lateral:** algunos picos en 554 / 622 / 659 Hz aparecen en Suno y en Udio. Coinciden con notas musicales (Do#5, Re#5, Mi5): probablemente sean afinación perfecta de la IA, no artefactos del decoder.
 
+- **Curva de ablación (`scripts/09_ablation_curve.py`):** la misma ablación, pero barriendo el umbral K ∈ {10, 8, 6, 5, 4, 3, 2,5, 2}. Usa las funciones de `08_peaks.py`: picos por fold, el mismo modelo entrenado por fold y 10 repeticiones del control al azar.
+  - Para cada canción de test se usa la misma canción real donante en todos los umbrales.
+  - Con umbral bajo entran bins de ruido: con K = 2 hay ~570 "picos" de Suno y ~210 de Udio, así que en ese extremo "pico" significa algo más débil.
+  - Por qué empeoran las reales al pisar picos (chequeado en el fold 0 con K = 3): su puntaje sube en promedio solo +0,14, pero con un desvío de ~2. Lo que agrega el reemplazo es ruido, no un corrimiento hacia "IA". Para Suno, en cambio, el puntaje cae −5 en promedio.
+
 ## Heldout (preparado, no corrido)
 - `scripts/07_heldout.py` exige `--allow-heldout`. Con ese flag, 02 y 03 procesan **solo** el heldout y guardan los espectros en archivos aparte (`*__heldout.npz`), así que dev y heldout no se mezclan.
 - **Plan fijado de antemano:**
@@ -72,5 +77,6 @@ for t in speed-5 speed-2 speed+2 speed+5 speed+3 mp3_128 mp3_64 lp_6k lp_4k nois
   uv run python scripts/03_spectra.py --transform $t --uids data/results/robust_uids_$t.csv; done
 uv run python scripts/06_robustness.py eval   # E3/E4
 uv run python scripts/08_peaks.py             # ¿usa los picos? + Lasso
+uv run python scripts/09_ablation_curve.py    # ablación barriendo el umbral
 uv run python scripts/05_figures.py           # docs/figs/
 ```

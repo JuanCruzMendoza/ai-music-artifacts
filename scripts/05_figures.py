@@ -261,6 +261,39 @@ def fig_peaks_retrain():
     plt.close(fig)
 
 
+def fig_ablation_curve():
+    """Ablación con umbral decreciente: picos pisados vs misma cantidad de bins al azar (modelo ya entrenado)."""
+    p = RES / "peaks_ablation_curve.csv"
+    if not p.exists():
+        return
+    d = pd.read_csv(p)
+    base = d[d["caso"] == "sin tocar"][["real", "suno_v3.5", "udio_130"]].mean() * 100
+    g = d[d["caso"] != "sin tocar"].groupby(["caso", "K"])[["n_bins", "real", "suno_v3.5", "udio_130"]].mean().reset_index()
+    n_band = len(FREQS[band_mask(choice()[0])])
+    fig, axes = plt.subplots(1, 3, figsize=(10, 3.6), sharey=True)
+    for ax, col, title in [(axes[0], "suno_v3.5", "Suno v3.5 detectado"), (axes[1], "udio_130", "Udio 130 detectado"),
+                           (axes[2], "real", "Reales bien clasificadas")]:
+        for caso, color, lab in [("picos", "#eb6834", "picos pisados"), ("azar", "#6250d6", "misma cantidad al azar")]:
+            gg = g[g["caso"] == caso].sort_values("n_bins")
+            x = np.r_[0, 100 * gg["n_bins"].values / n_band]
+            ax.plot(x, np.r_[base[col], gg[col].values * 100], "-o", ms=4, lw=1.6, color=color, label=lab)
+        ax.set_title(title, fontsize=10)
+        ax.set_xlabel("% de la banda pisada")
+        ax.set_ylim(50, 101)
+    gp = g[g["caso"] == "picos"].sort_values("n_bins")
+    for _, r in gp.iterrows():
+        if r["K"] in (10, 5, 3, 2):
+            axes[0].annotate(f"umbral {r['K']:g}", (100 * r["n_bins"] / n_band, r["suno_v3.5"] * 100),
+                             textcoords="offset points", xytext=(4, -12), fontsize=7.5, color=TEXT2)
+    axes[0].set_ylabel("%")
+    axes[0].legend(loc="lower left", fontsize=8.5)
+    fig.suptitle("Pisar picos (cada vez con umbral más bajo) vs pisar bins al azar, en el modelo ya entrenado",
+                 x=0.01, ha="left", fontweight="bold", fontsize=11)
+    fig.tight_layout()
+    fig.savefig(FIGS / "fig9_ablacion_curva.png")
+    plt.close(fig)
+
+
 def main():
     FIGS.mkdir(parents=True, exist_ok=True)
     band, C = choice()
@@ -271,6 +304,7 @@ def main():
     fig_robustness()
     fig_peaks_lasso()
     fig_peaks_retrain()
+    fig_ablation_curve()
     if (RES / "robustness.csv").exists():
         fig_pitch(band)
     fig_codec(m, spec)
